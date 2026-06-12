@@ -497,13 +497,45 @@ export default function VisualRenderer({ visual, themeColor }: VisualRendererPro
     );
   };
 
+  // Helper to map color names to raw hex codes for custom vector drawings
+  const getColorHex = (colorName: string | undefined): string => {
+    switch (colorName) {
+      case "cyan": return "#06b6d4";
+      case "indigo": return "#6366f1";
+      case "amber": return "#fbbf24";
+      case "rose": return "#f43f5e";
+      case "emerald": return "#10b981";
+      case "violet": return "#8b5cf6";
+      case "slate": return "#94a3b8";
+      default: return "#06b6d4"; // Cyan fallback
+    }
+  };
+
+  const getColorFillHex = (colorName: string | undefined, filled: boolean | undefined): string => {
+    if (!filled) return "none";
+    switch (colorName) {
+      case "cyan": return "rgba(6, 182, 212, 0.15)";
+      case "indigo": return "rgba(99, 102, 241, 0.15)";
+      case "amber": return "rgba(251, 191, 36, 0.15)";
+      case "rose": return "rgba(244, 63, 94, 0.15)";
+      case "emerald": return "rgba(16, 185, 129, 0.15)";
+      case "violet": return "rgba(139, 92, 246, 0.15)";
+      case "slate": return "rgba(148, 163, 184, 0.15)";
+      default: return "rgba(6, 182, 212, 0.15)";
+    }
+  };
+
   // Generic technical circuit blueprint layout for dynamically generated courses
   const renderGenericBlueprintSVG = () => {
+    const hasCustomElements = visual.blueprint_elements && visual.blueprint_elements.length > 0;
+
     return (
       <div className="relative w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 p-4 font-mono">
         <div className="absolute top-3 left-3 text-[10px] text-cyan-400 flex items-center gap-1.5 z-10">
           <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-          <span className="font-bold tracking-widest uppercase text-[9px] text-cyan-400">CLASSROOM HIGH-FIDELITY VECTOR CANVAS</span>
+          <span className="font-bold tracking-widest uppercase text-[9px] text-cyan-400">
+            {hasCustomElements ? "CLASSROOM BESPOKE HIGH-FIDELITY SCHEMATIC" : "CLASSROOM HIGH-FIDELITY VECTOR CANVAS"}
+          </span>
         </div>
         
         <div className="w-full h-72 flex items-center justify-center relative bg-slate-900/30 rounded-lg overflow-hidden">
@@ -551,18 +583,53 @@ export default function VisualRenderer({ visual, themeColor }: VisualRendererPro
             ))}
           </svg>
 
-          {/* Epic abstract centerpiece graphic */}
-          <div className="w-44 h-44 rounded-full bg-slate-950 border border-indigo-500/30 flex items-center justify-center p-3 relative shadow-2xl backdrop-blur-xs">
-            <div className="text-center">
-              <span className="text-4xl block mb-2 leading-none animate-pulse">🛰️</span>
-              <div className="text-[9px] text-cyan-300 font-bold uppercase tracking-wider">MODULE ANALYSIS</div>
-              <div className="text-[10px] text-pink-400 font-bold tracking-tight uppercase max-w-[120px] truncate">{visual.alt_text}</div>
+          {hasCustomElements ? (
+            /* Custom dynamically-generated high-fidelity SVG illustration */
+            <svg className="w-full h-full p-4 relative z-0" viewBox="0 0 100 100">
+              {visual.blueprint_elements?.map((el, i) => {
+                const strokeHex = getColorHex(el.color);
+                const fillHex = getColorFillHex(el.color, el.filled);
+                const sw = el.strokeWidth || 1;
+
+                if (el.type === "circle" && el.cx !== undefined && el.cy !== undefined && el.r !== undefined) {
+                  return <circle key={i} cx={el.cx} cy={el.cy} r={el.r} stroke={strokeHex} fill={fillHex} strokeWidth={sw} />;
+                }
+                if (el.type === "ellipse" && el.cx !== undefined && el.cy !== undefined && el.rx !== undefined && el.ry !== undefined) {
+                  return <ellipse key={i} cx={el.cx} cy={el.cy} rx={el.rx} ry={el.ry} stroke={strokeHex} fill={fillHex} strokeWidth={sw} />;
+                }
+                if (el.type === "rect" && el.x !== undefined && el.y !== undefined && el.w !== undefined && el.h !== undefined) {
+                  return <rect key={i} x={el.x} y={el.y} width={el.w} height={el.h} stroke={strokeHex} fill={fillHex} strokeWidth={sw} rx="1.5" />;
+                }
+                if (el.type === "line" && el.x1 !== undefined && el.y1 !== undefined && el.x2 !== undefined && el.y2 !== undefined) {
+                  return <line key={i} x1={el.x1} y1={el.y1} x2={el.x2} y2={el.y2} stroke={strokeHex} strokeWidth={sw} />;
+                }
+                if (el.type === "path" && el.d) {
+                  return <path key={i} d={el.d} stroke={strokeHex} fill={fillHex} strokeWidth={sw} />;
+                }
+                if (el.type === "text" && el.x !== undefined && el.y !== undefined && el.label) {
+                  return (
+                    <text key={i} x={el.x} y={el.y} fill={strokeHex} fontSize="3.8" fontWeight="black" textAnchor="middle" style={{ fontFamily: "monospace" }}>
+                      {el.label}
+                    </text>
+                  );
+                }
+                return null;
+              })}
+            </svg>
+          ) : (
+            /* Epic abstract centerpiece graphic */
+            <div className="w-44 h-44 rounded-full bg-slate-950 border border-indigo-500/30 flex items-center justify-center p-3 relative shadow-2xl backdrop-blur-xs">
+              <div className="text-center">
+                <span className="text-4xl block mb-2 leading-none animate-pulse">🛰️</span>
+                <div className="text-[9px] text-cyan-300 font-bold uppercase tracking-wider">MODULE ANALYSIS</div>
+                <div className="text-[10px] text-pink-400 font-bold tracking-tight uppercase max-w-[120px] truncate">{visual.alt_text}</div>
+              </div>
+              
+              {/* Overlay secondary compass lines */}
+              <div className="absolute inset-0 rounded-full border border-dashed border-slate-800 animate-spin" style={{ animationDuration: "25s" }}></div>
+              <div className="absolute inset-2 rounded-full border border-dotted border-cyan-500/20 animate-spin" style={{ animationDuration: "12s" }}></div>
             </div>
-            
-            {/* Overlay secondary compass lines */}
-            <div className="absolute inset-0 rounded-full border border-dashed border-slate-800 animate-spin" style={{ animationDuration: "25s" }}></div>
-            <div className="absolute inset-2 rounded-full border border-dotted border-cyan-500/20 animate-spin" style={{ animationDuration: "12s" }}></div>
-          </div>
+          )}
 
           {/* Active stats display */}
           <div className="absolute bottom-3 left-3 text-[9px] text-slate-400 leading-normal bg-slate-950/80 p-2 rounded border border-slate-800/80 font-mono">
@@ -573,7 +640,7 @@ export default function VisualRenderer({ visual, themeColor }: VisualRendererPro
 
           <div className="absolute bottom-3 right-3 text-[9px] text-right text-slate-500 leading-normal">
             <div>GRID ADDR: 0x7FFF92</div>
-            <div>RENDER SYSTEM: VECTOR</div>
+            <div>RENDER SYSTEM: {hasCustomElements ? "BESPOKE_VECTOR" : "STATIC_VECTOR"}</div>
           </div>
         </div>
 

@@ -10,11 +10,34 @@ export interface Hotspot {
   text: string;
 }
 
+export interface BlueprintElement {
+  type: "circle" | "rect" | "line" | "text" | "path" | "ellipse";
+  x1?: number;
+  y1?: number;
+  x2?: number;
+  y2?: number;
+  cx?: number;
+  cy?: number;
+  rx?: number;
+  ry?: number;
+  r?: number;
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+  d?: string;
+  label?: string;
+  color?: "cyan" | "indigo" | "amber" | "rose" | "emerald" | "violet" | "slate";
+  strokeWidth?: number;
+  filled?: boolean;
+}
+
 export interface Visual {
   type: "illustration" | "diagram" | "step_sequence" | "comparison" | "labeled_image";
   description: string;
   alt_text: string;
   hotspots?: Hotspot[];
+  blueprint_elements?: BlueprintElement[];
 }
 
 export type InteractiveType =

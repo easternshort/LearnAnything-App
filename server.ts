@@ -575,19 +575,23 @@ app.post("/api/generate-topic", async (req, res) => {
 
   console.log(`Calling Gemini to generate learning modules for topic: "${topic}"...`);
 
-  const SYSTEM_PROMPT = `You are LearnBot — an enthusiastic, visual, hands-on learning guide for an advanced sandbox classroom used by students of all ages (from age 7 all the way to 99!).
-Your job is to teach ANY topic with high-fidelity depth, exciting visual blueprints, and premium interactive challenges. No "half-ass emojis" or lazy placeholders. Provide full mechanical and structural details.
+  const SYSTEM_PROMPT = `You are LearnBot — an advanced, adaptive, high-fidelity learning architect. Your mission is to provide deep, unfiltered, and highly detailed visual courses on absolutely ANY topic the user looks up, exactly as requested, without sugar-coating or arbitrary restriction.
 
-YOUR TEACHING PHILOSOPHY:
-- One idea at a time. Never overwhelm — exactly 4 modules per topic.
-- Write with deep enthusiasm. High vocabulary but fully explained. Exciting for a kid, satisfying for an adult!
-- Every visual must be a custom interactive schematic blueprint. Always provide exactly 3 detailed educational target hotspots in the 'hotspots' array. Specify where their x% and y% coordinates are, and provide high-fidelity structural descriptions of what that part is, how it works, and why it is essential.
-- Always include helpful tips and a final physical world sandbox challenge.
+YOUR HEURISTIC ADAPTIVE LEARNING STRATEGY:
+1. ESTIMATE TARGET AUDIENCE:
+   - Carefully analyze the nature of the searched topic and estimate the age/developmental stage of the learner interested in it.
+   - For simple, introductory topics (e.g. learning the Alphabet, basic shape drawing, counting, secondary color mixing), estimate a young or introductory learner (e.g. Age 4-7) and use incredibly descriptive, direct, beautifully organized scaffolding to build concrete associations.
+   - For advanced, mature, physiological, technical, historical, or anatomical topics (e.g. Quantum Physics, Gas Turbine Mechanics, Human Reproductive Anatomy, Sexual History, Erotic Art Theories, or Medical/Sociological systems), estimate an adult learner (Age 18+ or medical/academic level). For these topics, write with strict professional terminology, biological/historical precision, thorough engineering or functional explanations, and absolute adult depth. Do NOT water down, skip, or censor key details.
 
-OUTPUT FORMAT — respond strictly with valid json adhering to the expected JSON schema structure. No other markup.`;
+2. BUILD CUSTOM HIGH-FIDELITY SCHEMATICS:
+   - For each and every concept module, you MUST design a custom high-fidelity blueprint visual.
+   - The "blueprint_elements" array must contain exactly 6 to 10 high-fidelity relative shape objects (circle, rect, line, text, path, ellipse) using 0-100 percentage coordinates. These shapes must be custom-tailored to represent the actual system, structural parts, molecular bonds, physical layouts, or relevant mechanical/anatomical models under study.
+   - Every single visual MUST ALSO have exactly 3 custom "hotspots" with clear, precise x, y coordinate markers pointing to specific components depicted in your custom blueprint. Provide rich, 2-sentence mechanical descriptions for each hotspot.
+
+Produce perfectly valid, complete JSON representing the requested course matching the target topic.`;
 
   try {
-    const prompt = `Create a fully structured interactive learning path with 4 sequential modules for the topic: "${topic}". Make it highly visual, educational (suitable for age 7 to 99), and packed with active hotspot coordinates (labeled_image type) and interactive questions (quiz/drag_drop/sequence/etc.).`;
+    const prompt = `Formulate a complete interactive sandbox learning course on "${topic}". First estimate the target audience/age level and adapt all 4 sequential modules to fit that target level perfectly. Provide a custom diagram layout with exactly 3 educational hotspot markers AND a bespoke list of 6 to 10 custom-generated vector blueprint shapes showing the mechanics under study.`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",
@@ -604,7 +608,7 @@ OUTPUT FORMAT — respond strictly with valid json adhering to the expected JSON
             tagline: { type: Type.STRING, description: "Exciting 1-sentence hook why this topic is amazing" },
             difficulty: { type: Type.STRING, description: "Must be one of: Beginner | Intermediate | Advanced" },
             estimated_time: { type: Type.STRING, description: "e.g. '15 minutes'" },
-            age_range: { type: Type.STRING, description: "e.g. 'All ages' or '10 and up'" },
+            age_range: { type: Type.STRING, description: "Estimated age and learning adjustment strategy" },
             cover_visual: { type: Type.STRING, description: "Vivid, rich sketch description of the cover card" },
             modules: {
               type: Type.ARRAY,
@@ -616,7 +620,7 @@ OUTPUT FORMAT — respond strictly with valid json adhering to the expected JSON
                   title: { type: Type.STRING },
                   emoji: { type: Type.STRING },
                   key_concept: { type: Type.STRING, description: "Single most important concept, in one brief sentence" },
-                  lesson: { type: Type.STRING, description: "2 to 3 short paragraphs. Friendly, paint a picture with words, under 100 words overall." },
+                  lesson: { type: Type.STRING, description: "2 to 3 short paragraphs. Deeply educational, custom adjusted based on target audience complexity." },
                   visual: {
                     type: Type.OBJECT,
                     properties: {
@@ -637,9 +641,38 @@ OUTPUT FORMAT — respond strictly with valid json adhering to the expected JSON
                           },
                           required: ["id", "label", "x", "y", "text"]
                         }
+                      },
+                      blueprint_elements: {
+                        type: Type.ARRAY,
+                        description: "Exactly 6 to 10 primitive shapes that together form a beautiful, custom blueprint diagram of this specific concept (0-100 relative scales). Do not use placeholders.",
+                        items: {
+                          type: Type.OBJECT,
+                          properties: {
+                            type: { type: Type.STRING, description: "Must be: circle | rect | line | text | path | ellipse" },
+                            x1: { type: Type.INTEGER },
+                            y1: { type: Type.INTEGER },
+                            x2: { type: Type.INTEGER },
+                            y2: { type: Type.INTEGER },
+                            cx: { type: Type.INTEGER },
+                            cy: { type: Type.INTEGER },
+                            r: { type: Type.INTEGER },
+                            rx: { type: Type.INTEGER },
+                            ry: { type: Type.INTEGER },
+                            x: { type: Type.INTEGER },
+                            y: { type: Type.INTEGER },
+                            w: { type: Type.INTEGER },
+                            h: { type: Type.INTEGER },
+                            d: { type: Type.STRING },
+                            label: { type: Type.STRING },
+                            color: { type: Type.STRING, description: "cyan | indigo | amber | rose | emerald | violet | slate" },
+                            strokeWidth: { type: Type.INTEGER },
+                            filled: { type: Type.BOOLEAN }
+                          },
+                          required: ["type"]
+                        }
                       }
                     },
-                    required: ["type", "description", "alt_text", "hotspots"]
+                    required: ["type", "description", "alt_text", "hotspots", "blueprint_elements"]
                   },
                   interactive: {
                     type: Type.OBJECT,
