@@ -1,0 +1,6 @@
+{
+  "name": "LearnAnything",
+  "description": "An interactive learning platform that teaches any topic using hands-on AI-guided modules, custom SVGs, and real-world challenges.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
