@@ -36,6 +36,7 @@ try {
 const DATA_DIR = path.join(process.cwd(), "data");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
 const TOPICS_FILE = path.join(DATA_DIR, "topics.json");
+const VISUAL_CACHE_FILE = path.join(DATA_DIR, "visual_cache.json");
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -356,6 +357,7 @@ const PRESEEDED_TOPICS = [
 // In-Memory Fallback DB
 let usersDb: Record<string, any> = {};
 let topicsDb: Record<string, any> = {};
+let visualCacheDb: Record<string, string> = {};
 
 // Load existing files if they exist
 try {
@@ -373,6 +375,9 @@ try {
     });
     topicsDb = initialTopics;
     fs.writeFileSync(TOPICS_FILE, JSON.stringify(topicsDb, null, 2));
+  }
+  if (fs.existsSync(VISUAL_CACHE_FILE)) {
+    visualCacheDb = JSON.parse(fs.readFileSync(VISUAL_CACHE_FILE, "utf-8"));
   }
 } catch (err) {
   console.error("Error loading JSON database files, falling back to empty stores:", err);
@@ -392,6 +397,14 @@ const saveTopics = () => {
     fs.writeFileSync(TOPICS_FILE, JSON.stringify(topicsDb, null, 2));
   } catch (err) {
     console.error("Failed to save topics database:", err);
+  }
+};
+
+const saveVisualCache = () => {
+  try {
+    fs.writeFileSync(VISUAL_CACHE_FILE, JSON.stringify(visualCacheDb, null, 2));
+  } catch (err) {
+    console.error("Failed to save visual cache database:", err);
   }
 };
 
@@ -549,6 +562,127 @@ app.post("/api/users/progress", (req, res) => {
   user.lastActive = new Date().toISOString();
   saveUsers();
   res.json({ user });
+});
+
+// Create an animated visual SVG dynamically for custom generated content!
+app.post("/api/generate-visual", async (req, res) => {
+  const { topicTitle, title, moduleNumber, description } = req.body;
+
+  if (!topicTitle || !title || !description) {
+    return res.status(400).json({ error: "Missing required parameters: topicTitle, title, description" });
+  }
+
+  const cacheKey = slugify(`${topicTitle}-${title}`);
+
+  // Checks and returns cached visual if available
+  if (visualCacheDb[cacheKey]) {
+    return res.json({ svg: visualCacheDb[cacheKey], cached: true });
+  }
+
+  if (!ai) {
+    // Elegant dynamic animated fallback placeholder
+    const fallbackSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+      <rect width="400" height="300" rx="12" fill="#020617" />
+      <g stroke="#1e293b" stroke-width="1">
+        <line x1="0" y1="50" x2="400" y2="50" />
+        <line x1="0" y1="100" x2="400" y2="100" />
+        <line x1="0" y1="150" x2="400" y2="150" />
+        <line x1="0" y1="200" x2="400" y2="200" />
+        <line x1="0" y1="250" x2="400" y2="250" />
+        <line x1="50" y1="0" x2="50" y2="300" />
+        <line x1="100" y1="0" x2="100" y2="300" />
+        <line x1="150" y1="0" x2="150" y2="300" />
+        <line x1="200" y1="0" x2="200" y2="300" />
+        <line x1="250" y1="0" x2="250" y2="300" />
+        <line x1="300" y1="0" x2="300" y2="300" />
+        <line x1="350" y1="0" x2="350" y2="300" />
+      </g>
+      <circle cx="200" cy="130" r="35" fill="none" stroke="#6366f1" stroke-width="2" stroke-dasharray="4,4">
+        <animateTransform attributeName="transform" type="rotate" from="0 200 130" to="360 200 130" dur="10s" repeatCount="indefinite" />
+      </circle>
+      <circle cx="200" cy="130" r="15" fill="#06b6d4" opacity="0.6">
+        <animate attributeName="opacity" values="0.3;0.8;0.3" dur="3s" repeatCount="indefinite" />
+      </circle>
+      <text x="200" y="210" font-family="monospace" font-size="12" font-weight="black" fill="#06b6d4" text-anchor="middle" letter-spacing="1">
+        ${title.substring(0, 30).toUpperCase()}
+      </text>
+      <text x="200" y="235" font-family="sans-serif" font-size="10" fill="#94a3b8" text-anchor="middle">
+        ${topicTitle}
+      </text>
+    </svg>`;
+    return res.json({ svg: fallbackSvg, cached: false, notice: "AI offline, generated high-craft vector sketch fallback code." });
+  }
+
+  try {
+    console.log(`Generating visual for module: "${title}" inside topic: "${topicTitle}"...`);
+
+    const systemInstruction = `You are an expert design technologist and SVG developer specializing in educational visuals.
+Your job is to generate a fully custom, animated, and visually stunning interactive vector diagram as raw standard-compliant SVG.
+Do NOT wrap your output in markdown code fences matching \`\`\`xml or \`\`\`svg. Return ONLY the raw SVG code.
+
+SVG Specifications:
+1. Must use exactly viewBox="0 0 400 300" and be standard compliant.
+2. Must have a clean, dark-mode background compatible with a luxury space slate or deep carbon workspace (use <rect width="400" height="300" rx="12" fill="#020617" />).
+3. Specify a nested <style> block containing multiple keyframe CSS animations. Use these animations to pulse glowing indicators, spin gears/rotors, stream bright light dashes along wire pathways, or slide sliders dynamically.
+4. Render beautiful, intricate, color-balanced lines, circles, ellipses, paths, and text labels with perfect centering and generous negative space.
+5. Create premium high-tech glowing accents using SVG <defs> like linear/radial gradients, <filter id="glow"> with <feGaussianBlur>, or dasharray paths.
+6. The graphic must depict the user's specific module title and concept with technical or biological realism. Avoid generic drawings. Represent each concept literally.
+7. Must be self-contained, valid standard SVG (no HTML wrappers) that renders perfectly as inner HTML.`;
+
+    const prompt = `Generate a standard-compliant animated SVG block for this concept:
+Topic: "${topicTitle}"
+Module Title: "${title}"
+Module Number: ${moduleNumber}
+Visual Directive description: "${description}"
+
+Ensure the response consists 100% of raw valid SVG tags, starting with <svg> and ending with </svg>. Do not include any explanation.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+      config: {
+        systemInstruction,
+        temperature: 0.15,
+      },
+    });
+
+    let svgCode = response.text || "";
+    if (svgCode.includes("```")) {
+      const match = svgCode.match(/```(?:xml|svg|html)?([\s\S]*?)```/);
+      if (match) {
+        svgCode = match[1].trim();
+      }
+    }
+    svgCode = svgCode.trim();
+
+    const startIdx = svgCode.indexOf("<svg");
+    const endIdx = svgCode.lastIndexOf("</svg>");
+    if (startIdx !== -1 && endIdx !== -1) {
+      svgCode = svgCode.substring(startIdx, endIdx + 6);
+    }
+
+    if (!svgCode.startsWith("<svg") || !svgCode.endsWith("</svg>")) {
+      throw new Error("Invalid SVG wrapper returned from AI model.");
+    }
+
+    // Store in our database cache
+    visualCacheDb[cacheKey] = svgCode;
+    saveVisualCache();
+
+    res.json({ svg: svgCode, cached: false });
+  } catch (err: any) {
+    console.error("Failed to generate dynamic SVG via Gemini:", err);
+    // Dynamic animated fallback placeholder on actual error
+    const errorFallbackSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+      <rect width="400" height="300" rx="12" fill="#020617" />
+      <circle cx="200" cy="120" r="30" fill="none" stroke="#f43f5e" stroke-width="2" stroke-dasharray="3,3" />
+      <text x="200" y="124" font-family="sans-serif" font-size="16" fill="#f43f5e" text-anchor="middle">⚠️</text>
+      <text x="200" y="180" font-family="sans-serif" font-size="12" font-weight="bold" fill="#f8fafc" text-anchor="middle">${title}</text>
+      <text x="200" y="200" font-family="sans-serif" font-size="10" fill="#f43f5e" text-anchor="middle">Dynamic Visualizer Standby</text>
+      <text x="200" y="225" font-family="monospace" font-size="8" fill="#475569" text-anchor="middle">${err.message || "Parse Exception"}</text>
+    </svg>`;
+    res.json({ svg: errorFallbackSvg, cached: false, error: err.message });
+  }
 });
 
 // Call Gemini AI on any random custom user-provided topic!

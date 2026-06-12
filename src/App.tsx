@@ -412,6 +412,7 @@ export default function App() {
                   module={activeTopic.modules.find((m) => m.module_number === activeModuleNumber)!}
                   totalModulesCount={activeTopic.modules.length}
                   themeColor={topicTheme}
+                  topicTitle={activeTopic.topic}
                   onGoBack={() => setActiveModuleNumber(null)}
                   onNext={() => {
                     const currentIdx = activeTopic.modules.findIndex((m) => m.module_number === activeModuleNumber);

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Layout, CheckCircle, HelpCircle, Eye, ShieldAlert, Sparkles, Navigation, Zap, Compass, RotateCw, PenTool, TrendingUp, Sliders } from "lucide-react";
 import { Visual } from "../types";
 
@@ -9,15 +9,108 @@ interface VisualRendererProps {
     text: string;
     badgeColor: string;
   };
+  topicTitle?: string;
+  moduleTitle?: string;
+  moduleNumber?: number;
 }
 
-export default function VisualRenderer({ visual, themeColor }: VisualRendererProps) {
+export default function VisualRenderer({
+  visual,
+  themeColor,
+  topicTitle,
+  moduleTitle,
+  moduleNumber,
+}: VisualRendererProps) {
   const [activeLabel, setActiveLabel] = useState<string | null>(null);
   const [interactiveThrottle, setInteractiveThrottle] = useState<number>(40); // 0% to 100% slider value
   const [joystickYaw, setJoystickYaw] = useState<number>(0); // -50 to 50
   const [activeSoilOrganic, setActiveSoilOrganic] = useState<string | null>(null);
 
+  const [dynamicSvg, setDynamicSvg] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [loadingStatus, setLoadingStatus] = useState<string>("");
+
+  const loadingStatusTexts = [
+    "Contacting AI design agent...",
+    "Drafting dynamic vector schematics...",
+    "Injecting modular CSS animations...",
+    "Fitting responsive viewport grids...",
+    "Coloring structural outlines...",
+    "Perfecting custom vector highlights..."
+  ];
+
   const { type, description, alt_text } = visual;
+
+  const isCustomDetailed = () => {
+    const descLower = description.toLowerCase();
+    return (
+      descLower.includes("drone") || descLower.includes("quadcopter") || descLower.includes("uav") ||
+      descLower.includes("knife") || descLower.includes("cut") || descLower.includes("chop") || descLower.includes("pinch") || descLower.includes("claw") ||
+      descLower.includes("soil") || descLower.includes("worm") || descLower.includes("layer") || descLower.includes("clay")
+    );
+  };
+
+  useEffect(() => {
+    if (isCustomDetailed()) {
+      setDynamicSvg(null);
+      return;
+    }
+
+    let isMounted = true;
+    setLoading(true);
+    setDynamicSvg(null);
+
+    let statusIndex = 0;
+    setLoadingStatus(loadingStatusTexts[0]);
+    const statusInterval = setInterval(() => {
+      statusIndex = (statusIndex + 1) % loadingStatusTexts.length;
+      if (isMounted) {
+        setLoadingStatus(loadingStatusTexts[statusIndex]);
+      }
+    }, 1200);
+
+    fetch("/api/generate-visual", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        topicTitle: topicTitle || "General Knowledge",
+        title: moduleTitle || "Dynamic Blueprint",
+        moduleNumber: moduleNumber || 1,
+        description: description,
+      }),
+    })
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP status error: ${res.status}`);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (isMounted) {
+          if (data.svg) {
+            setDynamicSvg(data.svg);
+          } else {
+            console.warn("API returned no SVG, loading fallback.");
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("Error fetching dynamic SVG:", err);
+      })
+      .finally(() => {
+        clearInterval(statusInterval);
+        if (isMounted) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+      clearInterval(statusInterval);
+    };
+  }, [description, moduleTitle, topicTitle]);
 
   // Labeled Image Interactive features
   const sampleLabelsForDrone = [
@@ -63,6 +156,22 @@ export default function VisualRenderer({ visual, themeColor }: VisualRendererPro
 
   const labels = getLabels();
 
+  // Helper to render interactive hotspot targets overlayed inside canvas boxes
+  const renderHotspotsForCanvas = (targetLabels: typeof labels) => {
+    return targetLabels.map((item) => (
+      <button
+        key={item.id}
+        onClick={() => setActiveLabel(activeLabel === item.id ? null : item.id)}
+        className="absolute w-8 h-8 -ml-4 -mt-4 rounded-full bg-white text-slate-800 border-2 border-indigo-600 shadow-md flex items-center justify-center font-bold text-xs hover:scale-110 active:scale-90 transition-all outline-none cursor-pointer group z-20"
+        style={{ left: item.x, top: item.y }}
+        title={item.label}
+      >
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-30"></span>
+        <span className="z-10 group-hover:scale-110">🔎</span>
+      </button>
+    ));
+  };
+
   // Custom detailed inline SVG for Drone Blueprint
   const renderDetailedDroneSVG = () => {
     const isPropActive = activeLabel === "prop";
@@ -94,10 +203,11 @@ export default function VisualRenderer({ visual, themeColor }: VisualRendererPro
             50% { transform: scale(0.95); }
           }
           .propeller-cw {
-            transform-origin: 100px 70deg;
+            transform-origin: 110px 70px;
             animation: rotor-spin-cw ${propellerAnimSpeed}s linear infinite;
           }
           .propeller-ccw {
+            transform-origin: 290px 70px;
             animation: rotor-spin-ccw ${propellerAnimSpeed}s linear infinite;
           }
         `}} />
@@ -131,7 +241,7 @@ export default function VisualRenderer({ visual, themeColor }: VisualRendererPro
         <div className="absolute top-1/2 left-4 right-4 border-t border-dashed border-slate-800/40 pointer-events-none"></div>
 
         {/* Dynamic HUD Artificial Horizon overlay */}
-        <svg className="absolute inset-x-0 bottom-4 mx-auto w-32 h-10 pointer-events-none text-slate-500 opacity-65 font-mono text-[9px]" viewBox="0 0 100 30">
+        <svg className="absolute inset-x-0 bottom-4 mx-auto w-32 h-10 pointer-events-none text-slate-500 opacity-65 font-mono text-[9px] z-10" viewBox="0 0 100 30">
           <line x1="10" y1="15" x2="40" y2="15" stroke="currentColor" strokeWidth="1.5" />
           <line x1="60" y1="15" x2="90" y2="15" stroke="currentColor" strokeWidth="1.5" />
           <path d="M 45,15 A 5,5 0 0,1 55,15" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -139,104 +249,109 @@ export default function VisualRenderer({ visual, themeColor }: VisualRendererPro
         </svg>
 
         {/* The main diagram drawing canvas */}
-        <div className="relative w-full h-80 flex items-center justify-center p-6 bg-radial from-slate-900 via-slate-950 to-slate-950">
-          <svg className="w-full max-w-sm h-full select-none" viewBox="0 0 400 300">
-            {/* Background circular radar layout */}
-            <circle cx="200" cy="150" r="130" fill="none" stroke="#1e293b" strokeWidth="1" strokeDasharray="4,4" />
-            <circle cx="200" cy="150" r="80" fill="none" stroke="#1e293b" strokeWidth="1.5" />
-            <circle cx="200" cy="150" r="30" fill="none" stroke="#334155" strokeWidth="1" />
+        <div className="relative w-full bg-radial from-slate-900 via-slate-950 to-slate-950 p-6 flex flex-col items-center justify-center">
+          <div className="relative w-full max-w-sm aspect-[4/3] bg-slate-950 rounded-xl overflow-hidden border border-slate-800/50 shadow-inner">
+            <svg className="w-full h-full select-none absolute inset-0 z-0" viewBox="0 0 400 300">
+              {/* Background circular radar layout */}
+              <circle cx="200" cy="150" r="130" fill="none" stroke="#1e293b" strokeWidth="1" strokeDasharray="4,4" />
+              <circle cx="200" cy="150" r="80" fill="none" stroke="#1e293b" strokeWidth="1.5" />
+              <circle cx="200" cy="150" r="30" fill="none" stroke="#334155" strokeWidth="1" />
 
-            {/* Arm struts of the Quadcopter */}
-            {/* Arm 1: Top-Left */}
-            <line x1="200" y1="150" x2="110" y2="70" stroke={isPropActive ? "#06b6d4" : "#475569"} strokeWidth="10" strokeLinecap="round" />
-            <line x1="200" y1="150" x2="110" y2="70" stroke="#0f172a" strokeWidth="5" strokeLinecap="round" />
-            {/* Arm 2: Top-Right */}
-            <line x1="200" y1="150" x2="290" y2="70" stroke={isPropActive ? "#06b6d4" : "#475569"} strokeWidth="10" strokeLinecap="round" />
-            <line x1="200" y1="150" x2="290" y2="70" stroke="#0f172a" strokeWidth="5" strokeLinecap="round" />
-            {/* Arm 3: Bottom-Left */}
-            <line x1="200" y1="150" x2="110" y2="230" stroke={isPropActive ? "#06b6d4" : "#475569"} strokeWidth="10" strokeLinecap="round" />
-            <line x1="200" y1="150" x2="110" y2="230" stroke="#0f172a" strokeWidth="5" strokeLinecap="round" />
-            {/* Arm 4: Bottom-Right */}
-            <line x1="200" y1="150" x2="290" y2="230" stroke={isPropActive ? "#06b6d4" : "#475569"} strokeWidth="10" strokeLinecap="round" />
-            <line x1="200" y1="150" x2="290" y2="230" stroke="#0f172a" strokeWidth="5" strokeLinecap="round" />
+              {/* Arm struts of the Quadcopter */}
+              {/* Arm 1: Top-Left */}
+              <line x1="200" y1="150" x2="110" y2="70" stroke={isPropActive ? "#06b6d4" : "#475569"} strokeWidth="10" strokeLinecap="round" />
+              <line x1="200" y1="150" x2="110" y2="70" stroke="#0f172a" strokeWidth="5" strokeLinecap="round" />
+              {/* Arm 2: Top-Right */}
+              <line x1="200" y1="150" x2="290" y2="70" stroke={isPropActive ? "#06b6d4" : "#475569"} strokeWidth="10" strokeLinecap="round" />
+              <line x1="200" y1="150" x2="290" y2="70" stroke="#0f172a" strokeWidth="5" strokeLinecap="round" />
+              {/* Arm 3: Bottom-Left */}
+              <line x1="200" y1="150" x2="110" y2="230" stroke={isPropActive ? "#06b6d4" : "#475569"} strokeWidth="10" strokeLinecap="round" />
+              <line x1="200" y1="150" x2="110" y2="230" stroke="#0f172a" strokeWidth="5" strokeLinecap="round" />
+              {/* Arm 4: Bottom-Right */}
+              <line x1="200" y1="150" x2="290" y2="230" stroke={isPropActive ? "#06b6d4" : "#475569"} strokeWidth="10" strokeLinecap="round" />
+              <line x1="200" y1="150" x2="290" y2="230" stroke="#0f172a" strokeWidth="5" strokeLinecap="round" />
 
-            {/* Carbon Structural Frame connectors */}
-            <rect x="180" y="80" width="40" height="140" rx="20" fill="#1e293b" stroke="#334155" strokeWidth="2" />
-            <circle cx="200" cy="150" r="45" fill="#0f172a" stroke={isBrainActive ? "#f59e0b" : "#475569"} strokeWidth={isBrainActive ? 4 : 2} />
+              {/* Carbon Structural Frame connectors */}
+              <rect x="180" y="80" width="40" height="140" rx="20" fill="#1e293b" stroke="#334155" strokeWidth="2" />
+              <circle cx="200" cy="150" r="45" fill="#0f172a" stroke={isBrainActive ? "#f59e0b" : "#475569"} strokeWidth={isBrainActive ? 4 : 2} />
 
-            {/* Central flight core gyro computer / spinning light indicator */}
-            <circle cx="200" cy="150" r="25" fill="#111827" stroke="#334155" strokeWidth="1" />
-            <path d="M 190,150 A 10,10 0 0,1 210,150" fill="none" stroke="#f59e0b" strokeWidth="3" className="animate-spin" style={{ transformOrigin: "200px 150px" }} />
-            <circle cx="200" cy="150" r="6" fill="#f59e0b" className="animate-pulse" />
+              {/* Central flight core gyro computer / spinning light indicator */}
+              <circle cx="200" cy="150" r="25" fill="#111827" stroke="#334155" strokeWidth="1" />
+              <path d="M 190,150 A 10,10 0 0,1 210,150" fill="none" stroke="#f59e0b" strokeWidth="3" className="animate-spin" style={{ transformOrigin: "200px 150px" }} />
+              <circle cx="200" cy="150" r="6" fill="#f59e0b" className="animate-pulse" />
 
-            {/* Battery Module at Rear/Back (Y values 190-230) */}
-            <rect x="184" y="195" width="32" height="42" rx="4" fill={isBattActive ? "#10b981" : "#334155"} stroke={isBattActive ? "#34d399" : "#475569"} strokeWidth={isBattActive ? 3 : 1.5} />
-            {/* Power LED Indicator dots on the battery */}
-            <circle cx="192" cy="205" r="2" fill="#10b981" />
-            <circle cx="200" cy="205" r="2" fill="#10b981" />
-            <circle cx="208" cy="205" r="2" fill="#10b981" />
-            <circle cx="200" cy="220" r="5" fill="#030712" stroke="#4b5563" />
+              {/* Battery Module at Rear/Back (Y values 190-230) */}
+              <rect x="184" y="195" width="32" height="42" rx="4" fill={isBattActive ? "#10b981" : "#334155"} stroke={isBattActive ? "#34d399" : "#475569"} strokeWidth={isBattActive ? 3 : 1.5} />
+              {/* Power LED Indicator dots on the battery */}
+              <circle cx="192" cy="205" r="2" fill="#10b981" />
+              <circle cx="200" cy="205" r="2" fill="#10b981" />
+              <circle cx="208" cy="205" r="2" fill="#10b981" />
+              <circle cx="200" cy="220" r="5" fill="#030712" stroke="#4b5563" />
 
-            {/* Camera Gimbal assembly at the Nose Front (Y values 75) */}
-            <rect x="188" y="55" width="24" height="28" rx="3" fill="#1e293b" stroke="#475569" strokeWidth="1.5" />
-            <line x1="200" y1="50" x2="200" y2="58" stroke="#ef4444" strokeWidth="3" />
-            {/* Spherical Camera Glass lens sphere */}
-            <circle cx="200" cy="68" r="10" fill="#090d16" stroke="#06b6d4" strokeWidth="2" />
-            <circle cx="197" cy="65" r="3" fill="#ffffff" opacity="0.7" />
+              {/* Camera Gimbal assembly at the Nose Front (Y values 75) */}
+              <rect x="188" y="55" width="24" height="28" rx="3" fill="#1e293b" stroke="#475569" strokeWidth="1.5" />
+              <line x1="200" y1="50" x2="200" y2="58" stroke="#ef4444" strokeWidth="3" />
+              {/* Spherical Camera Glass lens sphere */}
+              <circle cx="200" cy="68" r="10" fill="#090d16" stroke="#06b6d4" strokeWidth="2" />
+              <circle cx="197" cy="65" r="3" fill="#ffffff" opacity="0.7" />
 
-            {/* Drone Motor Caps (4 corners) */}
-            {/* Top-Left */}
-            <circle cx="110" cy="70" r="16" fill="#1e293b" stroke="#334155" strokeWidth="2" />
-            <circle cx="110" cy="70" r="6" fill="#ef4444" />
-            {/* Top-Right */}
-            <circle cx="290" cy="70" r="16" fill="#1e293b" stroke="#334155" strokeWidth="2" />
-            <circle cx="290" cy="70" r="6" fill="#ef4444" />
-            {/* Bottom-Left */}
-            <circle cx="110" cy="230" r="16" fill="#1e293b" stroke="#334155" strokeWidth="2" />
-            <circle cx="110" cy="230" r="6" fill="#22c55e" />
-            {/* Bottom-Right */}
-            <circle cx="290" cy="230" r="16" fill="#1e293b" stroke="#334155" strokeWidth="2" />
-            <circle cx="290" cy="230" r="6" fill="#22c55e" />
+              {/* Drone Motor Caps (4 corners) */}
+              {/* Top-Left */}
+              <circle cx="110" cy="70" r="16" fill="#1e293b" stroke="#334155" strokeWidth="2" />
+              <circle cx="110" cy="70" r="6" fill="#ef4444" />
+              {/* Top-Right */}
+              <circle cx="290" cy="70" r="16" fill="#1e293b" stroke="#334155" strokeWidth="2" />
+              <circle cx="290" cy="70" r="6" fill="#ef4444" />
+              {/* Bottom-Left */}
+              <circle cx="110" cy="230" r="16" fill="#1e293b" stroke="#334155" strokeWidth="2" />
+              <circle cx="110" cy="230" r="6" fill="#22c55e" />
+              {/* Bottom-Right */}
+              <circle cx="290" cy="230" r="16" fill="#1e293b" stroke="#334155" strokeWidth="2" />
+              <circle cx="290" cy="230" r="6" fill="#22c55e" />
 
-            {/* Dynamic visual flight LED glowing rings if active */}
-            {isLedActive && (
-              <>
-                <circle cx="110" cy="70" r="24" fill="none" stroke="#ef4444" strokeWidth="2" className="animate-ping" />
-                <circle cx="290" cy="70" r="24" fill="none" stroke="#ef4444" strokeWidth="2" className="animate-ping" strokeDasharray="3,3" />
-                <circle cx="110" cy="230" r="24" fill="none" stroke="#22c55e" strokeWidth="2" className="animate-ping" strokeDasharray="3,3" />
-                <circle cx="290" cy="230" r="24" fill="none" stroke="#22c55e" strokeWidth="2" className="animate-ping" />
-              </>
-            )}
+              {/* Dynamic visual flight LED glowing rings if active */}
+              {isLedActive && (
+                <>
+                  <circle cx="110" cy="70" r="24" fill="none" stroke="#ef4444" strokeWidth="2" className="animate-ping" />
+                  <circle cx="290" cy="70" r="24" fill="none" stroke="#ef4444" strokeWidth="2" className="animate-ping" strokeDasharray="3,3" />
+                  <circle cx="110" cy="230" r="24" fill="none" stroke="#22c55e" strokeWidth="2" className="animate-ping" strokeDasharray="3,3" />
+                  <circle cx="290" cy="230" r="24" fill="none" stroke="#22c55e" strokeWidth="2" className="animate-ping" />
+                </>
+              )}
 
-            {/* Rotors / Propeller blades layered drawing (Animated spinning arcs!) */}
-            {/* Top-Left: Propeller CW */}
-            <g style={{ transformOrigin: "110px 70px" }} className={interactiveThrottle > 0 ? "propeller-cw" : undefined}>
-              <ellipse cx="110" cy="70" rx="35" ry="5" fill="rgba(6, 182, 212, 0.2)" stroke="#06b6d4" strokeWidth="1" strokeDasharray="2,2" />
-              <line x1="75" y1="70" x2="145" y2="70" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" />
-              <rect x="73" y="68" width="8" height="4" rx="2" fill="#334155" />
-              <rect x="139" y="68" width="8" height="4" rx="2" fill="#334155" />
-            </g>
+              {/* Rotors / Propeller blades layered drawing (Animated spinning arcs!) */}
+              {/* Top-Left: Propeller CW */}
+              <g style={{ transformOrigin: "110px 70px" }} className={interactiveThrottle > 0 ? "propeller-cw" : undefined}>
+                <ellipse cx="110" cy="70" rx="35" ry="5" fill="rgba(6, 182, 212, 0.2)" stroke="#06b6d4" strokeWidth="1" strokeDasharray="2,2" />
+                <line x1="75" y1="70" x2="145" y2="70" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" />
+                <rect x="73" y="68" width="8" height="4" rx="2" fill="#334155" />
+                <rect x="139" y="68" width="8" height="4" rx="2" fill="#334155" />
+              </g>
 
-            {/* Top-Right: Propeller CCW */}
-            <g style={{ transformOrigin: "290px 70px" }} className={interactiveThrottle > 0 ? "propeller-cw" : undefined}>
-              <ellipse cx="290" cy="70" rx="35" ry="5" fill="rgba(6, 182, 212, 0.2)" stroke="#06b6d4" strokeWidth="1" strokeDasharray="2,2" />
-              <line x1="255" y1="70" x2="325" y2="70" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" />
-              <rect x="253" y="68" width="8" height="4" rx="2" fill="#334155" />
-              <rect x="319" y="68" width="8" height="4" rx="2" fill="#334155" />
-            </g>
+              {/* Top-Right: Propeller CCW */}
+              <g style={{ transformOrigin: "290px 70px" }} className={interactiveThrottle > 0 ? "propeller-ccw" : undefined}>
+                <ellipse cx="290" cy="70" rx="35" ry="5" fill="rgba(6, 182, 212, 0.15)" stroke="#06b6d4" strokeWidth="1" strokeDasharray="2,2" />
+                <line x1="255" y1="70" x2="325" y2="70" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" />
+                <rect x="253" y="68" width="8" height="4" rx="2" fill="#334155" />
+                <rect x="319" y="68" width="8" height="4" rx="2" fill="#334155" />
+              </g>
 
-            {/* Bottom-Left: Propeller CCW */}
-            <g style={{ transformOrigin: "110px 230px" }} className={interactiveThrottle > 0 ? "propeller-cw" : undefined}>
-              <ellipse cx="110" cy="230" rx="35" ry="5" fill="rgba(6, 182, 212, 0.2)" stroke="#06b6d4" strokeWidth="1" strokeDasharray="2,2" />
-              <line x1="75" y1="230" x2="145" y2="230" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" />
-            </g>
+              {/* Bottom-Left: Propeller CCW */}
+              <g style={{ transformOrigin: "110px 230px" }} className={interactiveThrottle > 0 ? "propeller-ccw" : undefined}>
+                <ellipse cx="110" cy="230" rx="35" ry="5" fill="rgba(6, 182, 212, 0.15)" stroke="#06b6d4" strokeWidth="1" strokeDasharray="2,2" />
+                <line x1="75" y1="230" x2="145" y2="230" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" />
+              </g>
 
-            {/* Bottom-Right: Propeller CW */}
-            <g style={{ transformOrigin: "290px 230px" }} className={interactiveThrottle > 0 ? "propeller-cw" : undefined}>
-              <ellipse cx="290" cy="230" rx="35" ry="5" fill="rgba(6, 182, 212, 0.2)" stroke="#06b6d4" strokeWidth="1" strokeDasharray="2,2" />
-              <line x1="255" y1="230" x2="325" y2="230" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" />
-            </g>
-          </svg>
+              {/* Bottom-Right: Propeller CW */}
+              <g style={{ transformOrigin: "290px 230px" }} className={interactiveThrottle > 0 ? "propeller-cw" : undefined}>
+                <ellipse cx="290" cy="230" rx="35" ry="5" fill="rgba(6, 182, 212, 0.2)" stroke="#06b6d4" strokeWidth="1" strokeDasharray="2,2" />
+                <line x1="255" y1="230" x2="325" y2="230" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" />
+              </g>
+            </svg>
+
+            {/* Perfect overlay of absolute blinking hotspots centering perfectly inside the same-size aspect frame */}
+            {renderHotspotsForCanvas(labels)}
+          </div>
         </div>
 
         {/* Real-time slider controller to adjust thrust/altitude simulation directly */}
@@ -271,91 +386,96 @@ export default function VisualRenderer({ visual, themeColor }: VisualRendererPro
     return (
       <div className="relative w-full rounded-2xl overflow-hidden bg-amber-50/15 border border-amber-900/10 p-4">
         <div className="w-full h-72 flex items-center justify-center bg-radial from-orange-50/50 to-orange-100/40 rounded-xl relative p-3">
-          {/* Wooden chopping board panel lines */}
-          <div className="absolute inset-0 bg-gradient-to-r from-amber-100/30 via-orange-100/20 to-amber-200/30 m-2 rounded-lg border-2 border-amber-900/15 flex flex-col justify-between p-3 pointer-events-none">
-            <div className="w-full h-px bg-amber-900/10"></div>
-            <div className="w-full h-px bg-amber-900/10"></div>
-            <div className="w-full h-px bg-amber-900/10"></div>
-            <div className="w-full h-px bg-amber-900/15"></div>
-            <div className="w-full h-px bg-amber-900/10"></div>
-            <div className="w-full h-px bg-amber-900/10"></div>
+          <div className="relative w-full max-w-sm aspect-[4/3] rounded-lg overflow-hidden border border-amber-900/10 bg-white/20">
+            {/* Wooden chopping board panel lines */}
+            <div className="absolute inset-0 bg-gradient-to-r from-amber-100/30 via-orange-100/20 to-amber-200/30 m-2 rounded-lg border-2 border-amber-900/15 flex flex-col justify-between p-3 pointer-events-none">
+              <div className="w-full h-px bg-amber-900/10"></div>
+              <div className="w-full h-px bg-amber-900/10"></div>
+              <div className="w-full h-px bg-amber-900/10"></div>
+              <div className="w-full h-px bg-amber-900/15"></div>
+              <div className="w-full h-px bg-amber-900/10"></div>
+              <div className="w-full h-px bg-amber-900/10"></div>
+            </div>
+
+            <svg className="w-full h-full select-none absolute inset-0 z-10" viewBox="0 0 400 300">
+              {/* Labeled coordinate scale */}
+              <text x="10" y="20" fill="#9a3412" className="font-mono text-[9px] font-bold uppercase opacity-60">FRENCH CHEF ANATOMY - 200mm</text>
+              <line x1="20" y1="285" x2="380" y2="285" stroke="#9a3412" strokeWidth="1.5" strokeDasharray="3,3" opacity="0.4" />
+              <text x="200" y="278" textAnchor="middle" fill="#9a3412" className="font-mono text-[8px] opacity-50">BOARD PLANE ALIGNMENT</text>
+
+              {/* DAMP SLIP TOWEL underneath chopping board */}
+              {isBoardActive && (
+                <path d="M 40,260 L 360,260 L 370,288 L 30,288 Z" fill="#93c5fd" opacity="0.6" stroke="#2563eb" strokeWidth="1.5" className="animate-pulse" />
+              )}
+
+              {/* Sliced Vegetable / Yellow Onion layers under blade block */}
+              <g transform="translate(180, 160)">
+                {/* Outer skin */}
+                <path d="M -30,40 C -50,10 -30,-30 0,-30 C 30,-30 50,10 30,40 Z" fill="#fef3c7" stroke="#d97706" strokeWidth="1.5" />
+                <path d="M -20,38 C -35,15 -25,-20 0,-20 C 25,-20 35,15 20,38 Z" fill="#ffedd5" stroke="#f97316" strokeWidth="1" />
+                {/* Sliced half cross rings */}
+                <circle cx="5" cy="10" r="15" fill="none" stroke="#ea580c" strokeWidth="1.5" strokeDasharray="2,2" />
+                <circle cx="5" cy="10" r="25" fill="none" stroke="#ea580c" strokeWidth="1" />
+                <text x="5" y="47" textAnchor="middle" fill="#7c2d12" className="font-bold text-[9px]">ONION TARGET</text>
+              </g>
+
+              {/* Elegant Triple-riveted Chef's Knife Drawing */}
+              <g transform="translate(40, -10)">
+                {/* The Knife Handle (Tang, Wood Scales, Rivets) */}
+                <rect x="10" y="145" width="110" height="24" rx="6" fill="#1e293b" stroke="#334155" strokeWidth="1.5" />
+                
+                {/* Handle tang metal silver border strip */}
+                <line x1="12" y1="157" x2="118" y2="157" stroke="#94a3b8" strokeWidth="2.5" />
+                
+                {/* Rivets (3 shiny physical circle pegs) */}
+                <circle cx="30" cy="157" r="4.5" fill="#e2e8f0" stroke="#475569" strokeWidth="1" />
+                <circle cx="65" cy="157" r="4.5" fill="#e2e8f0" stroke="#475569" strokeWidth="1" />
+                <circle cx="100" cy="157" r="4.5" fill="#e2e8f0" stroke="#475569" strokeWidth="1" />
+
+                {/* Seamless Bolster Collar (Heavily highlighted when pinch grip is chosen) */}
+                <path d="M 119,141 L 132,141 L 132,175 L 119,173 Z" fill={isPinchActive ? "#eb5e28" : "#94a3b8"} stroke="#475569" strokeWidth="1.5" className={isPinchActive ? "animate-pulse" : ""} />
+                {isPinchActive && (
+                  <circle cx="125" cy="157" r="12" fill="none" stroke="#ef4444" strokeWidth="2" className="animate-ping" />
+                )}
+
+                {/* Satin-Finished Stainless Steel Blade Body with continuous Tapered profile */}
+                <path d="M 132,141 L 340,154 C 330,195 285,215 132,216 Z" fill="url(#silver-bevel)" stroke="#475569" strokeWidth="1.5" />
+                {/* Cutting Bevel Edge line (Extremely thin) */}
+                <path d="M 132,213 C 275,213 325,193 336,155" fill="none" stroke="#f8fafc" strokeWidth="1.5" strokeLinecap="round" />
+
+                {/* Hand Grip Pinch Indicator guidelines overlay */}
+                {isPinchActive && (
+                  <g>
+                    {/* Thumb print outline clamp */}
+                    <ellipse cx="125" cy="148" rx="8" ry="12" fill="none" stroke="#ef4444" strokeWidth="1.5" strokeDasharray="3,3" />
+                    <text x="125" y="128" textAnchor="middle" fill="#b91c1c" className="font-sans text-[8px] font-black uppercase font-bold text-center">Thumb Pinch</text>
+                    <path d="M 125,133 L 125,142" stroke="#ef4444" strokeWidth="1" markerEnd="arrow" />
+                  </g>
+                )}
+              </g>
+
+              {/* CURLED SAFETY CLAW WRIST/HAND OVERLAY (represented next to vegetable slicing zone) */}
+              <g transform="translate(230, 95)" opacity={isClawActive ? 1 : 0.45}>
+                {/* Knuckle protection shield drawing */}
+                <path d="M 20,10 C 10,20 10,40 22,55 C 34,70 50,75 50,60 C 50,45 35,35 30,10 Z" fill="none" stroke={isClawActive ? "#f97316" : "#475569"} strokeWidth="2.5" strokeLinecap="round" className={isClawActive ? "animate-pulse" : ""} />
+                {/* Guidelines representing knuckes shielding sliding steel */}
+                <line x1="18" y1="20" x2="18" y2="50" stroke="#f97316" strokeWidth={isClawActive ? 2 : 1} strokeDasharray="2,2" />
+                <text x="50" y="5" textAnchor="middle" fill="#ea580c" className="font-sans text-[8px] font-black uppercase font-bold text-center">Curled Shield Wall</text>
+              </g>
+
+              {/* Gradient Definitions */}
+              <defs>
+                <linearGradient id="silver-bevel" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#cbd5e1" />
+                  <stop offset="50%" stopColor="#f1f5f9" />
+                  <stop offset="100%" stopColor="#94a3b8" />
+                </linearGradient>
+              </defs>
+            </svg>
+
+            {/* Perfect overlay of absolute blinking hotspots centering perfectly inside the same-size aspect frame */}
+            {renderHotspotsForCanvas(labels)}
           </div>
-
-          <svg className="w-full max-w-sm h-full select-none z-10" viewBox="0 0 400 300">
-            {/* Labeled coordinate scale */}
-            <text x="10" y="20" fill="#9a3412" className="font-mono text-[9px] font-bold uppercase opacity-60">FRENCH CHEF ANATOMY - 200mm</text>
-            <line x1="20" y1="285" x2="380" y2="285" stroke="#9a3412" strokeWidth="1.5" strokeDasharray="3,3" opacity="0.4" />
-            <text x="200" y="278" textAnchor="middle" fill="#9a3412" className="font-mono text-[8px] opacity-50">BOARD PLANE ALIGNMENT</text>
-
-            {/* DAMP SLIP TOWEL underneath chopping board */}
-            {isBoardActive && (
-              <path d="M 40,260 L 360,260 L 370,288 L 30,288 Z" fill="#93c5fd" opacity="0.6" stroke="#2563eb" strokeWidth="1.5" className="animate-pulse" />
-            )}
-
-            {/* Sliced Vegetable / Yellow Onion layers under blade block */}
-            <g transform="translate(180, 160)">
-              {/* Outer skin */}
-              <path d="M -30,40 C -50,10 -30,-30 0,-30 C 30,-30 50,10 30,40 Z" fill="#fef3c7" stroke="#d97706" strokeWidth="1.5" />
-              <path d="M -20,38 C -35,15 -25,-20 0,-20 C 25,-20 35,15 20,38 Z" fill="#ffedd5" stroke="#f97316" strokeWidth="1" />
-              {/* Sliced half cross rings */}
-              <circle cx="5" cy="10" r="15" fill="none" stroke="#ea580c" strokeWidth="1.5" strokeDasharray="2,2" />
-              <circle cx="5" cy="10" r="25" fill="none" stroke="#ea580c" strokeWidth="1" />
-              <text x="5" y="47" textAnchor="middle" fill="#7c2d12" className="font-bold text-[9px]">ONION TARGET</text>
-            </g>
-
-            {/* Elegant Triple-riveted Chef's Knife Drawing */}
-            <g transform="translate(40, -10)">
-              {/* The Knife Handle (Tang, Wood Scales, Rivets) */}
-              <rect x="10" y="145" width="110" height="24" rx="6" fill="#1e293b" stroke="#334155" strokeWidth="1.5" />
-              
-              {/* Handle tang metal silver border strip */}
-              <line x1="12" y1="157" x2="118" y2="157" stroke="#94a3b8" strokeWidth="2.5" />
-              
-              {/* Rivets (3 shiny physical circle pegs) */}
-              <circle cx="30" cy="157" r="4.5" fill="#e2e8f0" stroke="#475569" strokeWidth="1" />
-              <circle cx="65" cy="157" r="4.5" fill="#e2e8f0" stroke="#475569" strokeWidth="1" />
-              <circle cx="100" cy="157" r="4.5" fill="#e2e8f0" stroke="#475569" strokeWidth="1" />
-
-              {/* Seamless Bolster Collar (Heavily highlighted when pinch grip is chosen) */}
-              <path d="M 119,141 L 132,141 L 132,175 L 119,173 Z" fill={isPinchActive ? "#eb5e28" : "#94a3b8"} stroke="#475569" strokeWidth="1.5" className={isPinchActive ? "animate-pulse" : ""} />
-              {isPinchActive && (
-                <circle cx="125" cy="157" r="12" fill="none" stroke="#ef4444" strokeWidth="2" className="animate-ping" />
-              )}
-
-              {/* Satin-Finished Stainless Steel Blade Body with continuous Tapered profile */}
-              <path d="M 132,141 L 340,154 C 330,195 285,215 132,216 Z" fill="url(#silver-bevel)" stroke="#475569" strokeWidth="1.5" />
-              {/* Cutting Bevel Edge line (Extremely thin) */}
-              <path d="M 132,213 C 275,213 325,193 336,155" fill="none" stroke="#f8fafc" strokeWidth="1.5" strokeLinecap="round" />
-
-              {/* Hand Grip Pinch Indicator guidelines overlay */}
-              {isPinchActive && (
-                <g>
-                  {/* Thumb print outline clamp */}
-                  <ellipse cx="125" cy="148" rx="8" ry="12" fill="none" stroke="#ef4444" strokeWidth="1.5" strokeDasharray="3,3" />
-                  <text x="125" y="128" textAnchor="middle" fill="#b91c1c" className="font-sans text-[8px] font-black uppercase">Thumb Pinch</text>
-                  <path d="M 125,133 L 125,142" stroke="#ef4444" strokeWidth="1" markerEnd="arrow" />
-                </g>
-              )}
-            </g>
-
-            {/* CURLED SAFETY CLAW WRIST/HAND OVERLAY (represented next to vegetable slicing zone) */}
-            <g transform="translate(230, 95)" opacity={isClawActive ? 1 : 0.45}>
-              {/* Knuckle protection shield drawing */}
-              <path d="M 20,10 C 10,20 10,40 22,55 C 34,70 50,75 50,60 C 50,45 35,35 30,10 Z" fill="none" stroke={isClawActive ? "#f97316" : "#475569"} strokeWidth="2.5" strokeLinecap="round" className={isClawActive ? "animate-pulse" : ""} />
-              {/* Guidelines representing knuckes shielding sliding steel */}
-              <line x1="18" y1="20" x2="18" y2="50" stroke="#f97316" strokeWidth={isClawActive ? 2 : 1} strokeDasharray="2,2" />
-              <text x="50" y="5" textAnchor="middle" fill="#ea580c" className="font-sans text-[8px] font-black uppercase">Curled Shield Wall</text>
-            </g>
-
-            {/* Gradient Definitions */}
-            <defs>
-              <linearGradient id="silver-bevel" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#cbd5e1" />
-                <stop offset="50%" stopColor="#f1f5f9" />
-                <stop offset="100%" stopColor="#94a3b8" />
-              </linearGradient>
-            </defs>
-          </svg>
         </div>
       </div>
     );
@@ -379,85 +499,90 @@ export default function VisualRenderer({ visual, themeColor }: VisualRendererPro
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           
           {/* Main detailed high resolution visual block */}
-          <div className="md:col-span-2 relative h-80 bg-stone-950 rounded-xl overflow-hidden border border-stone-800 flex items-center justify-center p-2">
-            <svg className="w-full h-full select-none" viewBox="0 0 300 240">
-              
-              {/* LAYER 1: O-Horizon (Top canopy, moss & grass mulch) Y values: 0 to 45 */}
-              <rect x="10" y="10" width="280" height="35" fill="#3f2e15" stroke="#1c1917" strokeWidth="1" />
-              <g transform="translate(15, 12)">
-                {/* Visual grass blades */}
-                <path d="M 10,12 L 15,2 L 20,12" fill="none" stroke="#10b981" strokeWidth="2" />
-                <path d="M 25,12 L 28,-1 L 32,12" fill="none" stroke="#059669" strokeWidth="2.5" />
-                <path d="M 45,12 L 40,3 L 48,12" fill="none" stroke="#22c55e" strokeWidth="2" />
-                <path d="M 70,12 L 75,-2 L 80,12" fill="none" stroke="#10b981" strokeWidth="2" opacity="0.8" />
-                <path d="M 110,12 L 112,0 L 118,12" fill="none" stroke="#059669" strokeWidth="2" />
-                <path d="M 160,12 L 165,3 L 170,12" fill="none" stroke="#10b981" strokeWidth="2.5" />
-                <path d="M 210,12 L 214,1 L 218,12" fill="none" stroke="#22c55e" strokeWidth="2" />
-                <path d="M 240,12 L 245,-3 L 250,12" fill="none" stroke="#059669" strokeWidth="2.5" />
-              </g>
-              <text x="150" y="32" textAnchor="middle" fill="#34d399" className="font-mono text-[9px] font-black uppercase tracking-wider">O-HORIZON (Litter Humus)</text>
-
-              {/* LAYER 2: A-Horizon (Topsoil organic root chamber) Y values: 45 to 110 */}
-              <rect x="10" y="45" width="280" height="65" fill="#291d0cf5" stroke="#1c1917" strokeWidth="1" />
-              
-              {/* Branching Plant Root System Network */}
-              <g stroke={isMycoActive ? "#c084fc" : "#e7e5e4"} strokeWidth={isMycoActive ? 2 : 1.5} fill="none" opacity="0.85">
-                {/* Plant root core */}
-                <path d="M 115,45 Q 110,65 100,85 T 130,110" />
-                <path d="M 115,45 Q 125,65 135,80" />
-                <path d="M 112,55 Q 85,70 70,85" />
-                <path d="M 70,85 Q 50,90 40,105" />
-                <path d="M 124,65 Q 155,75 170,95" />
-                <path d="M 170,95 Q 185,100 205,108" />
-              </g>
-
-              {/* White glowing Mycelium web filaments (displayed around roots when choice selected) */}
-              {isMycoActive && (
-                <g stroke="#d8b4fe" strokeWidth="1" strokeDasharray="1.5,1.5" fill="none" className="animate-pulse">
-                  <path d="M 100,85 L 85,95 L 75,90 M 135,80 L 150,90 L 160,82" />
-                  <path d="M 70,85 L 60,70 L 50,75 M 170,95 L 180,105 L 195,95" />
-                  <path d="M 40,105 L 20,110 L 25,100 M 110,65 L 115,78 L 105,82" />
+          <div className="md:col-span-2 relative w-full bg-stone-950 rounded-xl overflow-hidden border border-stone-800 p-4 flex items-center justify-center">
+            <div className="relative w-full max-w-md aspect-[5/4] rounded-lg overflow-hidden">
+              <svg className="w-full h-full select-none absolute inset-0 z-0" viewBox="0 0 300 240 font-mono">
+                
+                {/* LAYER 1: O-Horizon (Top canopy, moss & grass mulch) Y values: 0 to 45 */}
+                <rect x="10" y="10" width="280" height="35" fill="#3f2e15" stroke="#1c1917" strokeWidth="1" />
+                <g transform="translate(15, 12)">
+                  {/* Visual grass blades */}
+                  <path d="M 10,12 L 15,2 L 20,12" fill="none" stroke="#10b981" strokeWidth="2" />
+                  <path d="M 25,12 L 28,-1 L 32,12" fill="none" stroke="#059669" strokeWidth="2.5" />
+                  <path d="M 45,12 L 40,3 L 48,12" fill="none" stroke="#22c55e" strokeWidth="2" />
+                  <path d="M 70,12 L 75,-2 L 80,12" fill="none" stroke="#10b981" strokeWidth="2" opacity="0.8" />
+                  <path d="M 110,12 L 112,0 L 118,12" fill="none" stroke="#059669" strokeWidth="2" />
+                  <path d="M 160,12 L 165,3 L 170,12" fill="none" stroke="#10b981" strokeWidth="2.5" />
+                  <path d="M 210,12 L 214,1 L 218,12" fill="none" stroke="#22c55e" strokeWidth="2" />
+                  <path d="M 240,12 L 245,-3 L 250,12" fill="none" stroke="#059669" strokeWidth="2.5" />
                 </g>
-              )}
-              <text x="150" y="78" textAnchor="middle" fill="#fb923c" className="font-mono text-[9px] font-black uppercase tracking-wider">A-HORIZON (Topsoil & Roots)</text>
+                <text x="150" y="32" textAnchor="middle" fill="#34d399" className="font-mono text-[9px] font-black uppercase tracking-wider">O-HORIZON (Litter Humus)</text>
 
-              {/* Tunneling Segmented Earthworm (wiggles if selected!) */}
-              <g transform={isWormActive ? "translate(0, -3)" : undefined} className={isWormActive ? "animate-bounce" : undefined}>
-                {/* Worm Tunnel Path */}
-                <path d="M 130,105 Q 155,108 175,125 T 220,135" fill="none" stroke="#1c1917" strokeWidth="7" strokeLinecap="round" opacity="0.65" />
-                {/* Segmented Pink Worm */}
-                <path d="M 140,106 Q 158,107 172,122 T 210,133" fill="none" stroke="#f472b6" strokeWidth="4.5" strokeLinecap="round" />
-                {/* Segments highlights */}
-                <path d="M 142,106 L 143,106 M 150,106 L 151,106 M 160,110 L 161,111 M 170,121 L 171,123 M 185,129 L 186,130" fill="none" stroke="#db2777" strokeWidth="4" />
-                {/* Face dot */}
-                <circle cx="210" cy="133" r="1" fill="#111827" />
-              </g>
+                {/* LAYER 2: A-Horizon (Topsoil organic root chamber) Y values: 45 to 110 */}
+                <rect x="10" y="45" width="280" height="65" fill="#291d0cf5" stroke="#1c1917" strokeWidth="1" />
+                
+                {/* Branching Plant Root System Network */}
+                <g stroke={isMycoActive ? "#c084fc" : "#e7e5e4"} strokeWidth={isMycoActive ? 2 : 1.5} fill="none" opacity="0.85">
+                  {/* Plant root core */}
+                  <path d="M 115,45 Q 110,65 100,85 T 130,110" />
+                  <path d="M 115,45 Q 125,65 135,80" />
+                  <path d="M 112,55 Q 85,70 70,85" />
+                  <path d="M 70,85 Q 50,90 40,105" />
+                  <path d="M 124,65 Q 155,75 170,95" />
+                  <path d="M 170,95 Q 185,100 205,108" />
+                </g>
 
-              {/* LAYER 3: B-Horizon (Fine clay/silt sediments) Y values: 110 to 180 */}
-              <rect x="10" y="110" width="280" height="70" fill="#5c3d11" stroke="#1c1917" strokeWidth="1" />
-              <g fill="#78350f" opacity="0.45">
-                {/* Clay aggregates */}
-                <circle cx="35" cy="135" r="8" />
-                <circle cx="240" cy="125" r="11" />
-                <circle cx="95" cy="165" r="12" />
-                <circle cx="55" cy="155" r="6" />
-                <circle cx="165" cy="160" r="10" />
-                <circle cx="255" cy="155" r="7" />
-              </g>
-              <text x="150" y="145" textAnchor="middle" fill="#b45309" className="font-mono text-[9px] font-black uppercase tracking-wider">B-HORIZON (Mineral Clay Subsoil)</text>
-              
-              {/* LAYER 4: C-Horizon (Crumbling Bedrock fragments) Y values: 180 to 230 */}
-              <rect x="10" y="180" width="280" height="50" fill="#44403c" stroke="#1c1917" strokeWidth="1" />
-              <g fill="#78716c" opacity="0.6" stroke="#292524" strokeWidth="1.5">
-                {/* Hexagonal sharp bedrock chunks */}
-                <polygon points="25,190 45,185 55,205 35,215 15,200" />
-                <polygon points="120,200 150,188 165,205 145,225 115,215" />
-                <polygon points="215,205 245,195 260,210 235,228 210,218" />
-                <polygon points="75,205 98,200 102,218 80,224" />
-              </g>
-              <text x="150" y="210" textAnchor="middle" fill="#a8a29e" className="font-mono text-[9px] font-black uppercase tracking-wider">C-HORIZON (Crumbling Rock Bedrock)</text>
+                {/* White glowing Mycelium web filaments (displayed around roots when choice selected) */}
+                {isMycoActive && (
+                  <g stroke="#d8b4fe" strokeWidth="1" strokeDasharray="1.5,1.5" fill="none" className="animate-pulse">
+                    <path d="M 100,85 L 85,95 L 75,90 M 135,80 L 150,90 L 160,82" />
+                    <path d="M 70,85 L 60,70 L 50,75 M 170,95 L 180,105 L 195,95" />
+                    <path d="M 40,105 L 20,110 L 25,100 M 110,65 L 115,78 L 105,82" />
+                  </g>
+                )}
+                <text x="150" y="78" textAnchor="middle" fill="#fb923c" className="font-mono text-[9px] font-black uppercase tracking-wider">A-HORIZON (Topsoil & Roots)</text>
 
-            </svg>
+                {/* Tunneling Segmented Earthworm (wiggles if selected!) */}
+                <g transform={isWormActive ? "translate(0, -3)" : undefined} className={isWormActive ? "animate-bounce" : undefined}>
+                  {/* Worm Tunnel Path */}
+                  <path d="M 130,105 Q 155,108 175,125 T 220,135" fill="none" stroke="#1c1917" strokeWidth="7" strokeLinecap="round" opacity="0.65" />
+                  {/* Segmented Pink Worm */}
+                  <path d="M 140,106 Q 158,107 172,122 T 210,133" fill="none" stroke="#f472b6" strokeWidth="4.5" strokeLinecap="round" />
+                  {/* Segments highlights */}
+                  <path d="M 142,106 L 143,106 M 150,106 L 151,106 M 160,110 L 161,111 M 170,121 L 171,123 M 185,129 L 186,130" fill="none" stroke="#db2777" strokeWidth="4" />
+                  {/* Face dot */}
+                  <circle cx="210" cy="133" r="1" fill="#111827" />
+                </g>
+
+                {/* LAYER 3: B-Horizon (Fine clay/silt sediments) Y values: 110 to 180 */}
+                <rect x="10" y="110" width="280" height="70" fill="#5c3d11" stroke="#1c1917" strokeWidth="1" />
+                <g fill="#78350f" opacity="0.45">
+                  {/* Clay aggregates */}
+                  <circle cx="35" cy="135" r="8" />
+                  <circle cx="240" cy="125" r="11" />
+                  <circle cx="95" cy="165" r="12" />
+                  <circle cx="55" cy="155" r="6" />
+                  <circle cx="165" cy="160" r="10" />
+                  <circle cx="255" cy="155" r="7" />
+                </g>
+                <text x="150" y="145" textAnchor="middle" fill="#b45309" className="font-mono text-[9px] font-black uppercase tracking-wider">B-HORIZON (Mineral Clay Subsoil)</text>
+                
+                {/* LAYER 4: C-Horizon (Crumbling Bedrock fragments) Y values: 180 to 230 */}
+                <rect x="10" y="180" width="280" height="50" fill="#44403c" stroke="#1c1917" strokeWidth="1" />
+                <g fill="#78716c" opacity="0.6" stroke="#292524" strokeWidth="1.5">
+                  {/* Hexagonal sharp bedrock chunks */}
+                  <polygon points="25,190 45,185 55,205 35,215 15,200" />
+                  <polygon points="120,200 150,188 165,205 145,225 115,215" />
+                  <polygon points="215,205 245,195 260,210 235,228 210,218" />
+                  <polygon points="75,205 98,200 102,218 80,224" />
+                </g>
+                <text x="150" y="210" textAnchor="middle" fill="#a8a29e" className="font-mono text-[9px] font-black uppercase tracking-wider">C-HORIZON (Crumbling Rock Bedrock)</text>
+
+              </svg>
+
+              {/* Perfect overlay of absolute blinking hotspots centering perfectly inside the soil layer aspect container */}
+              {renderHotspotsForCanvas(labels)}
+            </div>
           </div>
 
           {/* Side stats / Soil element card panel selector details */}
@@ -667,6 +792,39 @@ export default function VisualRenderer({ visual, themeColor }: VisualRendererPro
     if (descLower.includes("soil") || descLower.includes("worm") || descLower.includes("layer") || descLower.includes("clay")) {
       return renderDetailedSoilSVG();
     }
+
+    // Dynamic AI Generated SVG render flow
+    if (loading) {
+      return (
+        <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex flex-col items-center justify-center p-6 text-center select-none min-h-[300px]">
+          {/* Futuristic radar or particle scanning circle */}
+          <div className="relative w-16 h-16 mb-4 flex items-center justify-center">
+            <div className="absolute inset-0 rounded-full border-4 border-dashed border-indigo-500 animate-spin" style={{ animationDuration: "8s" }}></div>
+            <div className="absolute inset-2 rounded-full border-2 border-dotted border-cyan-400 animate-spin" style={{ animationDuration: "4s" }}></div>
+            <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse" />
+          </div>
+          <h4 className="text-sm font-extrabold text-slate-100 tracking-tight font-sans">
+            Drafting Beautiful Blueprint
+          </h4>
+          <p className="text-xs text-indigo-400 font-mono mt-1.5 animate-pulse min-h-[16px]">
+            {loadingStatus}
+          </p>
+          <p className="text-[10px] text-slate-500 mt-3 leading-normal max-w-sm">
+            Writing coordinates, loading styling properties, and rendering responsive SVG pathways.
+          </p>
+        </div>
+      );
+    }
+
+    if (dynamicSvg) {
+      return (
+        <div 
+          className="relative w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 p-0 text-slate-100 flex items-center justify-center [&>svg]:w-full [&>svg]:h-auto shadow-inner"
+          dangerouslySetInnerHTML={{ __html: dynamicSvg }}
+        />
+      );
+    }
+
     return renderGenericBlueprintSVG();
   };
 
@@ -688,8 +846,8 @@ export default function VisualRenderer({ visual, themeColor }: VisualRendererPro
             {/* The actual premium SVG drawing goes here! */}
             {renderDetailedVisual()}
 
-            {/* Interactive Target Dots overlayed perfectly at precise points */}
-            {labels.map((item) => (
+            {/* Interactive Target Dots overlayed perfectly at precise points (for fallback blueprints only, as custom ones handle coordinates locally) */}
+            {!isCustomDetailed() && labels.map((item) => (
               <button
                 key={item.id}
                 onClick={() => setActiveLabel(activeLabel === item.id ? null : item.id)}

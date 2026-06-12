@@ -18,6 +18,7 @@ interface ModuleCardProps {
     accentText: string;
     badgeColor: string;
   };
+  topicTitle?: string;
 }
 
 export default function ModuleCard({
@@ -27,6 +28,7 @@ export default function ModuleCard({
   onNext,
   onMarkCompleted,
   themeColor,
+  topicTitle,
 }: ModuleCardProps) {
   const [challengeCompleted, setChallengeCompleted] = useState(false);
 
@@ -96,6 +98,9 @@ export default function ModuleCard({
               text: themeColor.text,
               badgeColor: themeColor.badgeColor,
             }}
+            topicTitle={topicTitle}
+            moduleTitle={module.title}
+            moduleNumber={module.module_number}
           />
         )}
 
